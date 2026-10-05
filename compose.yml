@@ -1,0 +1,59 @@
+# Copyright (c) 2026 Xavier Beheydt <xavier.beheydt@gmail.com>
+
+services:
+  traefik:
+    image: traefik:v3.7
+    container_name: traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt:/letsencrypt
+    command:
+      # Entrypoints: HTTP always redirects to HTTPS
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.http.tls=true"
+      # Every router on websecure gets a Let's Encrypt certificate by default
+      - "--entrypoints.websecure.http.tls.certresolver=le"
+
+      # Let's Encrypt
+      - "--certificatesresolvers.le.acme.email=${ACME_EMAIL:?ACME_EMAIL is required}"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+
+      # Docker provider: only containers with traefik.enable=true are exposed
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=proxy"
+
+      # API & dashboard (served only through the router below, never insecure)
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+
+      - "--log.level=INFO"
+      - "--accesslog=true"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.${DOMAIN:?DOMAIN is required}`)"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.middlewares=dashboard-auth"
+      - "traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_USERS:?TRAEFIK_DASHBOARD_USERS is required}"
+
+networks:
+  # Other stacks join this network as `external: true` to be routed by Traefik
+  proxy:
+    name: proxy
+
+volumes:
+  letsencrypt:
