@@ -17,6 +17,7 @@ certs: env
     set -euo pipefail
     set -a; . ./.env; set +a
     : "${DOMAIN:?DOMAIN is required in .env}"
+    mkdir -p certs
     cd certs
     if [ ! -f ca.crt ]; then
         openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
@@ -76,3 +77,9 @@ ps:
 # Follow the logs
 logs:
     docker compose logs -f
+
+# Remove the containers, the proxy network, the letsencrypt volume, .env and certs/
+[confirm("Remove containers, proxy network, letsencrypt volume, .env and certs/? [y/N]")]
+clean: env
+    docker compose down --volumes --remove-orphans
+    rm -f .env certs/*

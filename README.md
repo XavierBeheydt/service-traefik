@@ -14,6 +14,7 @@ Run `just` to list them. `up`, `down`, `start`, `stop` and `ps` are the common r
 - `just certs`: generate a local CA (`certs/ca.crt`, kept across runs) and a certificate for `DOMAIN` and `*.DOMAIN`, plus `certs/tls.yml` that makes it Traefik's default certificate
 - `just up`: create `.env` and, when `TLS_CERT_RESOLVER` is empty, the local certificate if it is missing, then `docker compose up -d`
 - `just down` / `just start` / `just stop` / `just ps` / `just logs`
+- `just clean`: after a confirmation, remove the containers, the `proxy` network, the `letsencrypt` volume, `.env` and the generated certificates. On the VPS this drops the Let's Encrypt certificates, which then have to be issued again (mind the rate limits).
 
 ## Local testing
 
