@@ -48,19 +48,19 @@ certs: env
     echo "Certificate for ${DOMAIN} and *.${DOMAIN} written to certs/"
     echo "Trust certs/ca.crt in your browser, or use: curl --cacert certs/ca.crt"
 
-# Create the shared internal proxy network if it is missing
+# Create the shared internal ingress network if it is missing
 networks:
     #!/usr/bin/env bash
     set -euo pipefail
-    if ! internal=$(docker network inspect -f '{{{{.Internal}}' proxy 2>/dev/null); then
-        docker network create --internal proxy >/dev/null
-        echo "Created the internal proxy network"
+    if ! internal=$(docker network inspect -f '{{{{.Internal}}' ingress 2>/dev/null); then
+        docker network create --internal ingress >/dev/null
+        echo "Created the internal ingress network"
     elif [ "$internal" != true ]; then
-        echo "The proxy network is not internal: stop every stack, run \`docker network rm proxy\`, then start them again" >&2
+        echo "The ingress network is not internal: stop every stack, run \`docker network rm ingress\`, then start them again" >&2
         exit 1
     fi
 
-# Start the stack (creates .env, the proxy network, and the local certificate when no resolver is set)
+# Start the stack (creates .env, the ingress network, and the local certificate when no resolver is set)
 up: env networks
     #!/usr/bin/env bash
     set -euo pipefail
@@ -90,7 +90,7 @@ ps:
 logs:
     docker compose logs -f
 
-# Remove the containers, the letsencrypt volume, .env and certs/ (the shared proxy network is kept)
+# Remove the containers, the letsencrypt volume, .env and certs/ (the shared ingress network is kept)
 [confirm("Remove containers, letsencrypt volume, .env and certs/? [y/N]")]
 clean: env
     docker compose down --volumes --remove-orphans

@@ -10,10 +10,10 @@ Run `just` to list them. `up`, `down`, `start`, `stop` and `ps` are the common r
 
 - `just env`: create `.env` from `.env.example` if it is missing
 - `just certs`: generate a local CA (`certs/ca.crt`, kept across runs) and a certificate for `DOMAIN` and `*.DOMAIN`, plus `certs/tls.yml` that makes it Traefik's default certificate
-- `just networks`: create the shared `proxy` network (internal) if it is missing. It fails if `proxy` exists but is not internal (see [Networks](#networks)).
-- `just up`: create `.env`, the `proxy` network and, when `TLS_CERT_RESOLVER` is empty, the local certificate if it is missing, then `docker compose up -d`
+- `just networks`: create the shared `ingress` network (internal) if it is missing. It fails if `ingress` exists but is not internal (see [Networks](#networks)).
+- `just up`: create `.env`, the `ingress` network and, when `TLS_CERT_RESOLVER` is empty, the local certificate if it is missing, then `docker compose up -d`
 - `just down` / `just start` / `just stop` / `just ps` / `just logs`
-- `just clean`: after a confirmation, remove the containers, the `letsencrypt` volume, `.env` and the generated certificates. The shared `proxy` network is kept. On the VPS this drops the Let's Encrypt certificates, which then have to be issued again (mind the rate limits).
+- `just clean`: after a confirmation, remove the containers, the `letsencrypt` volume, `.env` and the generated certificates. The shared `ingress` network is kept. On the VPS this drops the Let's Encrypt certificates, which then have to be issued again (mind the rate limits).
 
 ## Local testing
 
@@ -40,22 +40,24 @@ With `TLS_CERT_RESOLVER=le`, every HTTPS router gets a Let's Encrypt certificate
 
 ## Networks
 
-- `proxy`: shared between the stacks and **internal**, so it has no Internet access. It only carries the traffic between Traefik and the routed containers. It is not owned by any stack: the `up` recipe of every stack that uses it creates it if it is missing (`docker network create --internal proxy`).
+- `ingress`: shared between the stacks and **internal**, so it has no Internet access. It only carries the traffic between Traefik and the routed containers. It is not owned by any stack: the `up` recipe of every stack that uses it creates it if it is missing (`docker network create --internal ingress`).
 - `egress`: Traefik's own network, with outbound access. It carries the published ports 80/443 and the calls to Let's Encrypt.
 
-A container reaches the Internet only through a non-internal network. Each stack declares its own (`egress`) for the containers that need it, instead of getting it through `proxy` as a side effect.
+A container reaches the Internet only through a non-internal network. Each stack declares its own (`egress`) for the containers that need it, instead of getting it through `ingress` as a side effect.
 
-`proxy` used to be a normal network owned by this stack. An existing non-internal `proxy` has to be recreated once: stop every stack (`just down` in the parent repo), run `docker network rm proxy`, then start them again.
+`ingress` replaces `proxy`, a normal network that this stack used to own. To migrate, stop every stack (`just down` in the parent repo), run `docker network rm proxy` if it is still there, then start them again.
+
+Docker Swarm creates its own network named `ingress` when it is initialized. This setup uses plain Compose, so there is no conflict, but enabling Swarm on the same host would require renaming this network.
 
 ## Exposing another stack
 
-Attach the container to the external `proxy` network, add labels, and create the network in the stack's `up` recipe like `just networks` does here:
+Attach the container to the external `ingress` network, add labels, and create the network in the stack's `up` recipe like `just networks` does here:
 
 ```yaml
 services:
   app:
     networks:
-      - proxy
+      - ingress
       - egress   # only if the app needs to reach the Internet
     labels:
       - "traefik.enable=true"
@@ -63,7 +65,7 @@ services:
       - "traefik.http.routers.app.entrypoints=websecure"
 
 networks:
-  proxy:
+  ingress:
     external: true
   egress:
 ```
