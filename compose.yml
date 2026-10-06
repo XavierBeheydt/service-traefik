@@ -8,8 +8,7 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - ingress
-      - egress
+      - proxy
     ports:
       - "${HTTP_PORT:-80}:80"
       - "${HTTPS_PORT:-443}:443"
@@ -42,7 +41,7 @@ services:
       # Docker provider: only containers with traefik.enable=true are exposed
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=ingress"
+      - "--providers.docker.network=proxy"
 
       # API & dashboard (served only through the router below, never insecure)
       - "--api.dashboard=true"
@@ -59,14 +58,9 @@ services:
       - "traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_USERS:?TRAEFIK_DASHBOARD_USERS is required}"
 
 networks:
-  # Shared and internal (no Internet access): only carries the traffic between
-  # Traefik and the routed containers. `just up` creates it if it is missing,
-  # and every stack routed by Traefik joins it as `external: true`.
-  ingress:
-    external: true
-  # Traefik's own access to the outside: the published ports 80/443 and the
-  # Let's Encrypt API (a container on internal networks only gets neither)
-  egress:
+  # Other stacks join this network as `external: true` to be routed by Traefik
+  proxy:
+    name: proxy
 
 volumes:
   letsencrypt:
